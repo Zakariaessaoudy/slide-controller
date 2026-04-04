@@ -1,0 +1,93 @@
+/* ── Reset ──────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Base ───────────────────────────────────────────────────────────────── */
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  overflow: hidden;
+
+  background: #0f0f13;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* Allow vertical scrolling but don't let horizontal swipes scroll */
+  touch-action: pan-y;
+  user-select: none;
+}
+
+/* ── Heading ────────────────────────────────────────────────────────────── */
+h1 {
+  font-size: 1.1rem;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #888;
+  margin-bottom: 2.5rem;
+}
+
+/* ── Button row ─────────────────────────────────────────────────────────── */
+.controls {
+  display: flex;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 480px;
+  padding: 0 1.5rem;
+}
+
+.btn {
+  flex: 1;
+  padding: 2.5rem 1rem;
+  border: none;
+  border-radius: 1.5rem;
+  font-size: 1.4rem;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease, opacity 0.08s ease;
+}
+
+.btn:active {
+  transform: scale(0.93);
+  opacity: 0.85;
+}
+
+.btn--prev {
+  background: #1e1e2e;
+  color: #a0a8d0;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+.btn--next {
+  background: #5865f2;
+  color: #fff;
+  box-shadow: 0 4px 32px rgba(88, 101, 242, 0.5);
+}
+
+/* ── Status line ────────────────────────────────────────────────────────── */
+.status {
+  margin-top: 2rem;
+  font-size: 0.8rem;
+  color: transparent;         /* invisible by default */
+  height: 1.2em;
+  transition: color 0.2s;
+}
+
+.status--ok  { color: #4caf50; }
+.status--err { color: #f44336; }
+
+/* ── Bottom hint ────────────────────────────────────────────────────────── */
+.hint {
+  position: fixed;
+  bottom: max(1.5rem, env(safe-area-inset-bottom));
+  font-size: 0.72rem;
+  color: #333;
+  text-align: center;
+}

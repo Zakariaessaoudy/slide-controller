@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Slide Controller</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <h1>Slide Controller</h1>
+
+  <div class="controls">
+    <button id="btn-prev" class="btn btn--prev" ontouchstart="">&#9664; Prev</button>
+    <button id="btn-next" class="btn btn--next" ontouchstart="">Next &#9654;</button>
+  </div>
+
+  <p class="status" id="status" aria-live="polite"></p>
+
+  <p class="hint">Tap a button &nbsp;·&nbsp; or swipe left / right</p>
+
+  <script src="/static/controller.js"></script>
+</body>
+</html>
