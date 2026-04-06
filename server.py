@@ -7,6 +7,7 @@ Serves the mobile web UI and relays button/swipe actions as arrow-key presses.
 import socket
 
 import pyautogui
+import Quartz
 from flask import Flask, jsonify, render_template
 
 # ── Configuration ─────────────────────────────────────────────────────────────
@@ -48,6 +49,29 @@ def next_slide():
 def prev_slide():
     pyautogui.press("left")
     return jsonify(action="prev")
+
+
+def _scroll_zoom(direction: int) -> None:
+    """Simulate Ctrl+scroll to trigger macOS system zoom (works in fullscreen/presentation mode).
+    direction: +1 = zoom in, -1 = zoom out
+    """
+    event = Quartz.CGEventCreateScrollWheelEvent2(
+        None, Quartz.kCGScrollEventUnitLine, 1, direction * 8, 0, 0
+    )
+    Quartz.CGEventSetFlags(event, Quartz.kCGEventFlagMaskControl)
+    Quartz.CGEventPost(Quartz.kCGHIDEventTap, event)
+
+
+@app.post("/zoom-in")
+def zoom_in():
+    _scroll_zoom(+1)
+    return jsonify(action="zoom-in")
+
+
+@app.post("/zoom-out")
+def zoom_out():
+    _scroll_zoom(-1)
+    return jsonify(action="zoom-out")
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
