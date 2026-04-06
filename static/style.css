@@ -71,6 +71,43 @@ h1 {
   box-shadow: 0 4px 32px rgba(88, 101, 242, 0.5);
 }
 
+/* ── Zoom pad ───────────────────────────────────────────────────────────── */
+.zoom-pad {
+  /* touch-action: none tells Chrome/Safari NOT to handle this area's
+     touch events natively — no browser zoom, no scroll hijack */
+  touch-action: none;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 480px;
+  padding: 0 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.zoom-pad__label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 7rem;
+  border-radius: 1.5rem;
+  border: 1.5px dashed #2c2c44;
+  color: #3a3a58;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  pointer-events: none; /* clicks/taps pass through to .zoom-pad */
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.zoom-pad--active .zoom-pad__label {
+  border-color: #5865f2;
+  color: #5865f2;
+}
+
 /* ── Status line ────────────────────────────────────────────────────────── */
 .status {
   margin-top: 2rem;
