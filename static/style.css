@@ -108,6 +108,11 @@ h1 {
   color: #5865f2;
 }
 
+.zoom-pad--panning .zoom-pad__label {
+  border-color: #f0a030;
+  color: #f0a030;
+}
+
 /* ── Status line ────────────────────────────────────────────────────────── */
 .status {
   margin-top: 2rem;

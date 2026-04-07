@@ -76,15 +76,20 @@ document.addEventListener("touchend", (e) => {
   sendAction(dx < 0 ? "next" : "prev");
 }, { passive: true });
 
-// ── Pinch-to-zoom gesture (zoom pad only) ───────────────────────────────────
-// The pad has touch-action:none (CSS) + preventDefault (JS) so Chrome never
-// zooms the browser page, only the remote slide.
+// ── Zoom pad — pinch to zoom + 1-finger pan ──────────────────────────────────
+// touch-action:none (CSS) + preventDefault (JS) blocks Chrome's native gestures.
+// 1 finger → pan the zoomed slide (moves macOS cursor, zoom view follows)
+// 2 fingers → pinch to zoom
 
 const PINCH_THRESHOLD = 6;   // px — lower = more sensitive
-const ZOOM_THROTTLE_MS = 100; // ms — faster repeat for smoother feel
+const ZOOM_THROTTLE_MS = 100; // ms between zoom steps
+const PAN_THROTTLE_MS  = 30;  // ms between pan events (~33 fps)
 
 let lastPinchDist = null;
-let zoomThrottle = false;
+let zoomThrottle  = false;
+let panLastX      = null;
+let panLastY      = null;
+let panThrottle   = false;
 
 const zoomPadEl = document.getElementById("zoom-pad");
 
@@ -94,24 +99,58 @@ function getPinchDist(touches) {
   return Math.hypot(dx, dy);
 }
 
+async function sendPan(dx, dy) {
+  // Fire-and-forget — no status flash to avoid flickering during drag
+  try {
+    await fetch("/pan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dx, dy }),
+    });
+  } catch { /* silent */ }
+}
+
 zoomPadEl.addEventListener("touchstart", (e) => {
-  if (e.touches.length === 2) {
+  e.preventDefault(); // block browser zoom / scroll on this element
+  if (e.touches.length === 1) {
+    // Start pan
+    panLastX = e.touches[0].clientX;
+    panLastY = e.touches[0].clientY;
+    zoomPadEl.classList.add("zoom-pad--panning");
+  } else if (e.touches.length === 2) {
+    // Second finger arrived — switch to pinch, cancel pan
+    panLastX = null;
+    panLastY = null;
+    zoomPadEl.classList.remove("zoom-pad--panning");
     lastPinchDist = getPinchDist(e.touches);
     zoomPadEl.classList.add("zoom-pad--active");
   }
-  e.preventDefault(); // block browser zoom on this element
 }, { passive: false });
 
 zoomPadEl.addEventListener("touchmove", (e) => {
   e.preventDefault(); // critical — blocks Chrome's native pinch-to-zoom
-  if (e.touches.length !== 2 || lastPinchDist === null || zoomThrottle) return;
-  const dist = getPinchDist(e.touches);
-  const delta = dist - lastPinchDist;
-  if (Math.abs(delta) >= PINCH_THRESHOLD) {
-    sendAction(delta > 0 ? "zoom-in" : "zoom-out");
-    lastPinchDist = dist;
-    zoomThrottle = true;
-    setTimeout(() => { zoomThrottle = false; }, ZOOM_THROTTLE_MS);
+
+  if (e.touches.length === 1 && panLastX !== null && !panThrottle) {
+    // Pan: compute delta from last recorded position
+    const dx = e.touches[0].clientX - panLastX;
+    const dy = e.touches[0].clientY - panLastY;
+    panLastX = e.touches[0].clientX;
+    panLastY = e.touches[0].clientY;
+    if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
+      sendPan(dx, dy);
+      panThrottle = true;
+      setTimeout(() => { panThrottle = false; }, PAN_THROTTLE_MS);
+    }
+  } else if (e.touches.length === 2 && lastPinchDist !== null && !zoomThrottle) {
+    // Pinch: compare distance to last recorded
+    const dist  = getPinchDist(e.touches);
+    const delta = dist - lastPinchDist;
+    if (Math.abs(delta) >= PINCH_THRESHOLD) {
+      sendAction(delta > 0 ? "zoom-in" : "zoom-out");
+      lastPinchDist = dist;
+      zoomThrottle = true;
+      setTimeout(() => { zoomThrottle = false; }, ZOOM_THROTTLE_MS);
+    }
   }
 }, { passive: false });
 
@@ -119,6 +158,11 @@ zoomPadEl.addEventListener("touchend", (e) => {
   if (e.touches.length < 2) {
     lastPinchDist = null;
     zoomPadEl.classList.remove("zoom-pad--active");
+  }
+  if (e.touches.length < 1) {
+    panLastX = null;
+    panLastY = null;
+    zoomPadEl.classList.remove("zoom-pad--panning");
   }
 }, { passive: true });
 

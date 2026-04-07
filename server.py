@@ -7,11 +7,12 @@ Serves the mobile web UI and relays button/swipe actions as arrow-key presses.
 import socket
 
 import Quartz
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 PORT = 8080
+PAN_SPEED = 3.0  # amplify phone touch pixels → screen pixels
 
 # macOS virtual key codes
 _kVK_LeftArrow  = 0x7B
@@ -47,6 +48,18 @@ def _press_key(key_code: int) -> None:
         ev = Quartz.CGEventCreateKeyboardEvent(None, key_code, is_down)
         Quartz.CGEventSetFlags(ev, 0)
         Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+
+
+def _pan(dx: float, dy: float) -> None:
+    """Move the mouse cursor by (dx, dy).
+    The macOS system zoom view follows the cursor, so this pans the zoomed slide.
+    """
+    current = Quartz.CGEventGetLocation(Quartz.CGEventCreate(None))
+    new_pos = Quartz.CGPoint(current.x + dx * PAN_SPEED, current.y + dy * PAN_SPEED)
+    ev = Quartz.CGEventCreateMouseEvent(
+        None, Quartz.kCGEventMouseMoved, new_pos, Quartz.kCGMouseButtonLeft
+    )
+    Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
 
 
 def _scroll_zoom(direction: int) -> None:
@@ -90,6 +103,13 @@ def next_slide():
 def prev_slide():
     _press_key(_kVK_LeftArrow)
     return jsonify(action="prev")
+
+
+@app.post("/pan")
+def pan():
+    data = request.get_json(silent=True) or {}
+    _pan(float(data.get("dx", 0)), float(data.get("dy", 0)))
+    return jsonify(action="pan")
 
 
 @app.post("/zoom-in")
