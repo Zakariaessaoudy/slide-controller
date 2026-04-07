@@ -58,6 +58,8 @@ let swipeStartY = 0;
 let isPinching = false; // true while a 2-finger pinch is active — suppresses swipe
 
 document.addEventListener("touchstart", (e) => {
+  // Ignore any touch that starts inside the zoom pad — it has its own handlers
+  if (e.target.closest("#zoom-pad")) return;
   if (e.touches.length === 1) {
     isPinching = false;
     swipeStartX = e.changedTouches[0].clientX;
@@ -68,6 +70,8 @@ document.addEventListener("touchstart", (e) => {
 }, { passive: true });
 
 document.addEventListener("touchend", (e) => {
+  // Ignore any touch that ends inside the zoom pad — it has its own handlers
+  if (e.target.closest("#zoom-pad")) return;
   if (isPinching) return; // don't fire swipe if a pinch was in progress
   const dx = e.changedTouches[0].clientX - swipeStartX;
   const dy = e.changedTouches[0].clientY - swipeStartY;
