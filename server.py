@@ -12,7 +12,7 @@ from flask import Flask, jsonify, render_template, request
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 PORT = 8080
-PAN_SPEED = 3.0  # amplify phone touch pixels → screen pixels
+PAN_SPEED = 2.0  # amplify phone touch pixels → scroll pixels
 
 # macOS virtual key codes
 _kVK_LeftArrow  = 0x7B
@@ -51,14 +51,28 @@ def _press_key(key_code: int) -> None:
 
 
 def _pan(dx: float, dy: float) -> None:
-    """Move the mouse cursor by (dx, dy).
-    The macOS system zoom view follows the cursor, so this pans the zoomed slide.
+    """Simulate a two-finger trackpad scroll to pan within the zoomed slide.
+
+    Using scroll events (kCGScrollEventUnitPixel, no modifier flags) means
+    the OS and presentation apps treat this exactly like a two-finger swipe
+    on a physical trackpad — panning the content rather than triggering any
+    UI element (cursor movement would hit navigation buttons in Canva etc.).
+
+    Direction convention (natural scrolling):
+      drag finger UP   → dy < 0 → wheel1 > 0 → content scrolls up
+      drag finger DOWN → dy > 0 → wheel1 < 0 → content scrolls down
+      drag finger LEFT → dx < 0 → wheel2 > 0 → content scrolls left
+      drag finger RIGHT→ dx > 0 → wheel2 < 0 → content scrolls right
     """
-    current = Quartz.CGEventGetLocation(Quartz.CGEventCreate(None))
-    new_pos = Quartz.CGPoint(current.x + dx * PAN_SPEED, current.y + dy * PAN_SPEED)
-    ev = Quartz.CGEventCreateMouseEvent(
-        None, Quartz.kCGEventMouseMoved, new_pos, Quartz.kCGMouseButtonLeft
+    ev = Quartz.CGEventCreateScrollWheelEvent2(
+        None, Quartz.kCGScrollEventUnitPixel, 2,
+        int(-dy * PAN_SPEED),   # wheel1: vertical
+        int(-dx * PAN_SPEED),   # wheel2: horizontal
+        0
     )
+    # No flags — plain scroll, must not carry kCGEventFlagMaskControl
+    # (that would re-trigger the macOS zoom instead of panning)
+    Quartz.CGEventSetFlags(ev, 0)
     Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
 
 
