@@ -111,7 +111,8 @@ async function sendPan(dx, dy) {
 }
 
 zoomPadEl.addEventListener("touchstart", (e) => {
-  e.preventDefault(); // block browser zoom / scroll on this element
+  e.preventDefault();    // block browser zoom / scroll
+  e.stopPropagation();   // prevent document swipe detector from recording this touch
   if (e.touches.length === 1) {
     // Start pan
     panLastX = e.touches[0].clientX;
@@ -128,7 +129,8 @@ zoomPadEl.addEventListener("touchstart", (e) => {
 }, { passive: false });
 
 zoomPadEl.addEventListener("touchmove", (e) => {
-  e.preventDefault(); // critical — blocks Chrome's native pinch-to-zoom
+  e.preventDefault();
+  e.stopPropagation();
 
   if (e.touches.length === 1 && panLastX !== null && !panThrottle) {
     // Pan: compute delta from last recorded position
@@ -155,6 +157,7 @@ zoomPadEl.addEventListener("touchmove", (e) => {
 }, { passive: false });
 
 zoomPadEl.addEventListener("touchend", (e) => {
+  e.stopPropagation(); // prevent document swipe detector from firing on finger lift
   if (e.touches.length < 2) {
     lastPinchDist = null;
     zoomPadEl.classList.remove("zoom-pad--active");
