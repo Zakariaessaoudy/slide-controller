@@ -6,14 +6,17 @@ Serves the mobile web UI and relays button/swipe actions as arrow-key presses.
 
 import socket
 
-import pyautogui
 import Quartz
 from flask import Flask, jsonify, render_template
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 PORT = 8080
-pyautogui.FAILSAFE = False
+
+# macOS virtual key codes
+_kVK_LeftArrow  = 0x7B
+_kVK_RightArrow = 0x7C
+_kVK_Control    = 0x3B
 
 # ── App ───────────────────────────────────────────────────────────────────────
 
@@ -32,6 +35,44 @@ def get_local_ip() -> str:
         return "127.0.0.1"
 
 
+def _press_key(key_code: int) -> None:
+    """Press and release a key with modifier flags explicitly zeroed.
+
+    Using Quartz directly (instead of pyautogui) so we can call
+    CGEventSetFlags(..., 0) and guarantee no modifier is inherited from
+    the system state — which can be dirty after a synthetic Ctrl+scroll
+    zoom event is posted.
+    """
+    for is_down in (True, False):
+        ev = Quartz.CGEventCreateKeyboardEvent(None, key_code, is_down)
+        Quartz.CGEventSetFlags(ev, 0)
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+
+
+def _scroll_zoom(direction: int) -> None:
+    """Simulate Ctrl+scroll to trigger macOS system zoom.
+
+    After posting the scroll event we immediately send a synthetic Ctrl
+    key-up with flags=0 to flush the modifier state.  Without this,
+    macOS keeps Ctrl "active" at the HID level and the next arrow-key
+    press (from _press_key or any other source) is interpreted as
+    Ctrl+Arrow — which switches Mission Control desktops instead of
+    advancing a slide.
+
+    direction: +1 = zoom in, -1 = zoom out
+    """
+    scroll_ev = Quartz.CGEventCreateScrollWheelEvent2(
+        None, Quartz.kCGScrollEventUnitLine, 1, direction * 8, 0, 0
+    )
+    Quartz.CGEventSetFlags(scroll_ev, Quartz.kCGEventFlagMaskControl)
+    Quartz.CGEventPost(Quartz.kCGHIDEventTap, scroll_ev)
+
+    # Flush Ctrl modifier — key-up with zero flags resets the HID state.
+    ctrl_up = Quartz.CGEventCreateKeyboardEvent(None, _kVK_Control, False)
+    Quartz.CGEventSetFlags(ctrl_up, 0)
+    Quartz.CGEventPost(Quartz.kCGHIDEventTap, ctrl_up)
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.get("/")
@@ -41,25 +82,14 @@ def index():
 
 @app.post("/next")
 def next_slide():
-    pyautogui.press("right")
+    _press_key(_kVK_RightArrow)
     return jsonify(action="next")
 
 
 @app.post("/prev")
 def prev_slide():
-    pyautogui.press("left")
+    _press_key(_kVK_LeftArrow)
     return jsonify(action="prev")
-
-
-def _scroll_zoom(direction: int) -> None:
-    """Simulate Ctrl+scroll to trigger macOS system zoom (works in fullscreen/presentation mode).
-    direction: +1 = zoom in, -1 = zoom out
-    """
-    event = Quartz.CGEventCreateScrollWheelEvent2(
-        None, Quartz.kCGScrollEventUnitLine, 1, direction * 8, 0, 0
-    )
-    Quartz.CGEventSetFlags(event, Quartz.kCGEventFlagMaskControl)
-    Quartz.CGEventPost(Quartz.kCGHIDEventTap, event)
 
 
 @app.post("/zoom-in")
