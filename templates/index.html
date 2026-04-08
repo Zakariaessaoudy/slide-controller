@@ -16,18 +16,49 @@
 
   <h1>Slide Controller</h1>
 
-  <div class="controls">
-    <button id="btn-prev" class="btn btn--prev" ontouchstart="">&#9664; Prev</button>
-    <button id="btn-next" class="btn btn--next" ontouchstart="">Next &#9654;</button>
+  <!-- Top mode selector: Slides ↔ Mouse -->
+  <div class="mode-bar" id="mode-bar" role="group" aria-label="Controller mode">
+    <button id="btn-slides-mode" class="mode-bar__btn mode-bar__btn--active">Slides</button>
+    <button id="btn-mouse-mode"  class="mode-bar__btn">Mouse</button>
   </div>
 
-  <div class="zoom-pad" id="zoom-pad">
-    <span class="zoom-pad__label">Pinch to zoom&nbsp;·&nbsp;1 finger to point</span>
-  </div>
+  <!-- ── Slides mode ──────────────────────────────────────────────────────── -->
+  <!--
+    Slides mode exposes:
+      • Prev / Next buttons  (tap)
+      • Swipe left / right   (gesture anywhere outside zoom pad)
+      • Zoom pad             (pinch = system zoom, 1 finger = laser pointer)
+  -->
+  <section id="slides-ui">
+    <div class="controls">
+      <button id="btn-prev" class="btn btn--prev" ontouchstart="">&#9664; Prev</button>
+      <button id="btn-next" class="btn btn--next" ontouchstart="">Next &#9654;</button>
+    </div>
+    <div class="zoom-pad" id="zoom-pad">
+      <span class="zoom-pad__label">Pinch to zoom&nbsp;·&nbsp;1 finger to point</span>
+    </div>
+  </section>
+
+  <!-- ── Mouse mode ───────────────────────────────────────────────────────── -->
+  <!--
+    Mouse mode exposes:
+      • Large trackpad area  (1 finger = move cursor, 2 fingers = scroll)
+      • Hold gesture         (hold 400 ms without moving = drag lock)
+      • Click / Right / Double click buttons
+  -->
+  <section id="mouse-ui" hidden>
+    <div class="mouse-trackpad" id="mouse-trackpad">
+      <span class="mouse-trackpad__label">Move&nbsp;·&nbsp;2-finger scroll&nbsp;·&nbsp;hold to drag</span>
+    </div>
+    <div class="mouse-btns">
+      <button id="btn-left-click"   class="mouse-btn mouse-btn--left"   ontouchstart="">Click</button>
+      <button id="btn-right-click"  class="mouse-btn mouse-btn--right"  ontouchstart="">Right</button>
+      <button id="btn-double-click" class="mouse-btn mouse-btn--double" ontouchstart="">Double</button>
+    </div>
+  </section>
 
   <p class="status" id="status" aria-live="polite"></p>
-
-  <p class="hint">Swipe left / right &nbsp;·&nbsp; Pinch the pad to zoom</p>
+  <p class="hint"   id="hint">Swipe left&nbsp;/&nbsp;right&nbsp;·&nbsp;Pinch the pad to zoom</p>
 
   <script src="/static/controller.js"></script>
 </body>
