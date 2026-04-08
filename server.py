@@ -1,7 +1,24 @@
 #!/usr/bin/env python3
 """
 Wireless Slide Controller — Flask server
-Serves the mobile web UI and relays button/swipe actions as arrow-key presses.
+
+Two controller modes are exposed through this server:
+
+Slides mode
+  POST /next          — right-arrow key press
+  POST /prev          — left-arrow key press
+  POST /zoom-in       — Ctrl+scroll up  (macOS system zoom)
+  POST /zoom-out      — Ctrl+scroll down
+  POST /pointer       — move cursor by relative (dx, dy)   [laser pointer]
+
+Mouse mode
+  POST /click/left    — left mouse click at current cursor
+  POST /click/right   — right mouse click at current cursor
+  POST /click/double  — double left-click at current cursor
+  POST /mouse-down    — left button press (for drag)
+  POST /mouse-up      — left button release (end drag)
+  POST /scroll        — two-finger trackpad scroll by (dx, dy)
+  POST /drag          — drag-move cursor by (dx, dy) while button held
 """
 
 import socket
@@ -12,7 +29,8 @@ from flask import Flask, jsonify, render_template, request
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 PORT = 8080
-POINTER_SPEED = 5.0  # amplify phone touch pixels → screen cursor pixels
+POINTER_SPEED = 11   # amplify phone touch pixels → screen cursor pixels
+SCROLL_SPEED  = 3.0  # amplify phone touch pixels → scroll pixels (mouse mode)
 
 # macOS virtual key codes
 _kVK_LeftArrow  = 0x7B
@@ -73,6 +91,93 @@ def _move_cursor(dx: float, dy: float) -> None:
     Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
 
 
+# ── Mouse-mode helpers ────────────────────────────────────────────────────────
+
+def _click(button: int = 0) -> None:
+    """Simulate a mouse-button click (down + up) at the current cursor position.
+
+    button: 0 = left, 1 = right
+    """
+    pos = Quartz.CGEventGetLocation(Quartz.CGEventCreate(None))
+    consts = [
+        (Quartz.kCGEventLeftMouseDown,  Quartz.kCGEventLeftMouseUp,  Quartz.kCGMouseButtonLeft),
+        (Quartz.kCGEventRightMouseDown, Quartz.kCGEventRightMouseUp, Quartz.kCGMouseButtonRight),
+    ]
+    down_t, up_t, btn = consts[button]
+    Quartz.CGEventPost(Quartz.kCGHIDEventTap,
+        Quartz.CGEventCreateMouseEvent(None, down_t, pos, btn))
+    Quartz.CGEventPost(Quartz.kCGHIDEventTap,
+        Quartz.CGEventCreateMouseEvent(None, up_t,   pos, btn))
+
+
+def _double_click() -> None:
+    """Simulate a double left-click at the current cursor position.
+
+    Posts two down/up pairs with incrementing clickState so the OS registers
+    the second pair as a proper double-click (e.g. selects a word in text).
+    """
+    pos = Quartz.CGEventGetLocation(Quartz.CGEventCreate(None))
+    for n in (1, 2):
+        for ev_type in (Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp):
+            ev = Quartz.CGEventCreateMouseEvent(None, ev_type, pos, Quartz.kCGMouseButtonLeft)
+            Quartz.CGEventSetIntegerValueField(ev, Quartz.kCGMouseEventClickState, n)
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+
+
+def _scroll(dx: float, dy: float) -> None:
+    """Two-finger trackpad scroll using natural-scrolling convention.
+
+    finger UP   → dy < 0 → content moves up
+    finger DOWN → dy > 0 → content moves down
+    (same direction mapping as a physical Apple trackpad with natural scroll on)
+    """
+    ev = Quartz.CGEventCreateScrollWheelEvent2(
+        None, Quartz.kCGScrollEventUnitPixel, 2,
+        int(-dy * SCROLL_SPEED),   # wheel1: vertical
+        int(-dx * SCROLL_SPEED),   # wheel2: horizontal
+        0,
+    )
+    Quartz.CGEventSetFlags(ev, 0)  # no modifiers — plain scroll
+    Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+
+
+def _mouse_button(button: int, down: bool) -> None:
+    """Press or release a mouse button at the current cursor position.
+
+    Used to bracket a drag gesture: call with down=True before sending drag
+    deltas, then call with down=False when the finger lifts.
+    """
+    pos = Quartz.CGEventGetLocation(Quartz.CGEventCreate(None))
+    consts = [
+        (Quartz.kCGEventLeftMouseDown,  Quartz.kCGEventLeftMouseUp,  Quartz.kCGMouseButtonLeft),
+        (Quartz.kCGEventRightMouseDown, Quartz.kCGEventRightMouseUp, Quartz.kCGMouseButtonRight),
+    ]
+    ev_type = consts[button][0 if down else 1]
+    Quartz.CGEventPost(Quartz.kCGHIDEventTap,
+        Quartz.CGEventCreateMouseEvent(None, ev_type, pos, consts[button][2]))
+
+
+def _drag_move(dx: float, dy: float) -> None:
+    """Move the cursor by (dx, dy) while the left button is held.
+
+    Posts kCGEventLeftMouseDragged so applications receive the correct event
+    type for a drag operation (e.g. window moving, text selection, slider drag).
+    """
+    current = Quartz.CGEventGetLocation(Quartz.CGEventCreate(None))
+    new_x = current.x + dx * POINTER_SPEED
+    new_y = current.y + dy * POINTER_SPEED
+    bounds = Quartz.CGDisplayBounds(Quartz.CGMainDisplayID())
+    new_x = max(bounds.origin.x, min(new_x, bounds.origin.x + bounds.size.width  - 1))
+    new_y = max(bounds.origin.y, min(new_y, bounds.origin.y + bounds.size.height - 1))
+    new_pos = Quartz.CGPoint(new_x, new_y)
+    Quartz.CGWarpMouseCursorPosition(new_pos)
+    Quartz.CGEventPost(Quartz.kCGHIDEventTap,
+        Quartz.CGEventCreateMouseEvent(
+            None, Quartz.kCGEventLeftMouseDragged, new_pos, Quartz.kCGMouseButtonLeft))
+
+
+# ── Slides-mode zoom helper ───────────────────────────────────────────────────
+
 def _scroll_zoom(direction: int) -> None:
     """Simulate Ctrl+scroll to trigger macOS system zoom.
 
@@ -122,6 +227,54 @@ def pointer():
     _move_cursor(float(data.get("dx", 0)), float(data.get("dy", 0)))
     return jsonify(action="pointer")
 
+
+# ── Mouse-mode routes ─────────────────────────────────────────────────────────
+
+@app.post("/click/left")
+def click_left():
+    _click(0)
+    return jsonify(action="click-left")
+
+
+@app.post("/click/right")
+def click_right():
+    _click(1)
+    return jsonify(action="click-right")
+
+
+@app.post("/click/double")
+def click_double():
+    _double_click()
+    return jsonify(action="click-double")
+
+
+@app.post("/mouse-down")
+def mouse_down():
+    _mouse_button(0, True)
+    return jsonify(action="mouse-down")
+
+
+@app.post("/mouse-up")
+def mouse_up():
+    _mouse_button(0, False)
+    return jsonify(action="mouse-up")
+
+
+@app.post("/scroll")
+def scroll():
+    data = request.get_json(silent=True) or {}
+    _scroll(float(data.get("dx", 0)), float(data.get("dy", 0)))
+    return jsonify(action="scroll")
+
+
+@app.post("/drag")
+def drag():
+    data = request.get_json(silent=True) or {}
+    _drag_move(float(data.get("dx", 0)), float(data.get("dy", 0)))
+    return jsonify(action="drag")
+
+
+# ── Slides-mode zoom routes ───────────────────────────────────────────────────
 
 @app.post("/zoom-in")
 def zoom_in():
