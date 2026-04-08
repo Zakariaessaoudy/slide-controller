@@ -30,10 +30,52 @@ h1 {
   letter-spacing: 0.15em;
   text-transform: uppercase;
   color: #888;
-  margin-bottom: 2.5rem;
+  margin-bottom: 1rem;
 }
 
-/* ── Button row ─────────────────────────────────────────────────────────── */
+/* ── Mode bar (Slides / Mouse toggle) ──────────────────────────────────── */
+/*
+ * A pill-shaped segmented control that sits between the heading and the
+ * active mode's UI.  Only one mode is visible at a time; JS toggles the
+ * `hidden` attribute on #slides-ui / #mouse-ui and the --active class here.
+ */
+.mode-bar {
+  display: flex;
+  margin-bottom: 1.5rem;
+  border-radius: 2rem;
+  overflow: hidden;
+  border: 1.5px solid #2c2c44;
+}
+
+.mode-bar__btn {
+  background: transparent;
+  border: none;
+  color: #555570;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.5rem 2.2rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, color 0.15s;
+}
+
+.mode-bar__btn--active {
+  background: #2c2c44;
+  color: #fff;
+}
+
+/* ── Mode sections ──────────────────────────────────────────────────────── */
+#slides-ui,
+#mouse-ui {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* ── Button row (Slides mode) ───────────────────────────────────────────── */
 .controls {
   display: flex;
   gap: 1.5rem;
@@ -71,12 +113,18 @@ h1 {
   box-shadow: 0 4px 32px rgba(88, 101, 242, 0.5);
 }
 
-/* ── Zoom pad ───────────────────────────────────────────────────────────── */
+/* ── Zoom pad (Slides mode) ─────────────────────────────────────────────── */
+/*
+ * touch-action:none tells Chrome/Safari NOT to handle this area's touch
+ * events natively — no browser zoom, no scroll hijack.
+ *
+ * States:
+ *   (default)          — idle, dashed border
+ *   --active           — 2-finger pinch in progress (blue)
+ *   --pointing         — 1-finger pointer drag in progress (purple)
+ */
 .zoom-pad {
-  /* touch-action: none tells Chrome/Safari NOT to handle this area's
-     touch events natively — no browser zoom, no scroll hijack */
   touch-action: none;
-
   display: flex;
   align-items: center;
   justify-content: center;
@@ -111,6 +159,112 @@ h1 {
 .zoom-pad--pointing .zoom-pad__label {
   border-color: #c084fc;
   color: #c084fc;
+}
+
+/* ── Mouse trackpad (Mouse mode) ────────────────────────────────────────── */
+/*
+ * Larger than the zoom pad to give more room for fine cursor movement.
+ *
+ * States:
+ *   (default)          — idle, dashed border
+ *   --active           — 1-finger move in progress (blue)
+ *   --scrolling        — 2-finger scroll in progress (green)
+ *   --dragging         — hold-to-drag lock active; left button held (red,
+ *                        solid border to signal "button is pressed")
+ */
+.mouse-trackpad {
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 480px;
+  padding: 0 1.5rem;
+}
+
+.mouse-trackpad__label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 14rem;
+  border-radius: 1.5rem;
+  border: 1.5px dashed #2c2c44;
+  color: #3a3a58;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  pointer-events: none;
+  transition: border-color 0.15s, color 0.15s, border-style 0.15s;
+}
+
+.mouse-trackpad--active .mouse-trackpad__label {
+  border-color: #5865f2;
+  color: #5865f2;
+}
+
+.mouse-trackpad--scrolling .mouse-trackpad__label {
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+/* Solid border = left mouse button is currently held down */
+.mouse-trackpad--dragging .mouse-trackpad__label {
+  border-style: solid;
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+/* ── Mouse click buttons (Mouse mode) ──────────────────────────────────── */
+/*
+ * Three equal-width pill buttons in a row:
+ *   Click        — left click  (primary blue)
+ *   Right        — right click (dark)
+ *   Double       — double-click (dark)
+ */
+.mouse-btns {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 480px;
+  padding: 0 1.5rem;
+  margin-top: 1rem;
+}
+
+.mouse-btn {
+  flex: 1;
+  padding: 1.4rem 0.5rem;
+  border: none;
+  border-radius: 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease, opacity 0.08s ease;
+}
+
+.mouse-btn:active {
+  transform: scale(0.93);
+  opacity: 0.85;
+}
+
+.mouse-btn--left {
+  background: #5865f2;
+  color: #fff;
+  box-shadow: 0 4px 24px rgba(88, 101, 242, 0.4);
+}
+
+.mouse-btn--right {
+  background: #1e1e2e;
+  color: #a0a8d0;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+.mouse-btn--double {
+  background: #1e1e2e;
+  color: #a0a8d0;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
 /* ── Status line ────────────────────────────────────────────────────────── */
