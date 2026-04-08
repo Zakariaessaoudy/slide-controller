@@ -80,14 +80,14 @@ document.addEventListener("touchend", (e) => {
   sendAction(dx < 0 ? "next" : "prev");
 }, { passive: true });
 
-// ── Zoom pad — pinch to zoom + 1-finger pan ──────────────────────────────────
+// ── Zoom pad — pinch to zoom + 1-finger pointer ───────────────────────────────
 // touch-action:none (CSS) + preventDefault (JS) blocks Chrome's native gestures.
-// 1 finger → pan the zoomed slide (moves macOS cursor, zoom view follows)
+// 1 finger → move cursor (laser pointer)
 // 2 fingers → pinch to zoom
 
-const PINCH_THRESHOLD = 6;   // px — lower = more sensitive
+const PINCH_THRESHOLD  = 6;   // px — lower = more sensitive
 const ZOOM_THROTTLE_MS = 100; // ms between zoom steps
-const PAN_THROTTLE_MS  = 30;  // ms between pan events (~33 fps)
+const PAN_THROTTLE_MS  = 30;  // ms between pointer events (~33 fps)
 
 let lastPinchDist = null;
 let zoomThrottle  = false;
@@ -103,10 +103,9 @@ function getPinchDist(touches) {
   return Math.hypot(dx, dy);
 }
 
-async function sendPan(dx, dy) {
-  // Fire-and-forget — no status flash to avoid flickering during drag
+async function sendPointer(dx, dy) {
   try {
-    await fetch("/pan", {
+    await fetch("/pointer", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dx, dy }),
@@ -118,15 +117,14 @@ zoomPadEl.addEventListener("touchstart", (e) => {
   e.preventDefault();    // block browser zoom / scroll
   e.stopPropagation();   // prevent document swipe detector from recording this touch
   if (e.touches.length === 1) {
-    // Start pan
     panLastX = e.touches[0].clientX;
     panLastY = e.touches[0].clientY;
-    zoomPadEl.classList.add("zoom-pad--panning");
+    zoomPadEl.classList.add("zoom-pad--pointing");
   } else if (e.touches.length === 2) {
     // Second finger arrived — switch to pinch, cancel pan
     panLastX = null;
     panLastY = null;
-    zoomPadEl.classList.remove("zoom-pad--panning");
+    zoomPadEl.classList.remove("zoom-pad--pointing");
     lastPinchDist = getPinchDist(e.touches);
     zoomPadEl.classList.add("zoom-pad--active");
   }
@@ -137,13 +135,12 @@ zoomPadEl.addEventListener("touchmove", (e) => {
   e.stopPropagation();
 
   if (e.touches.length === 1 && panLastX !== null && !panThrottle) {
-    // Pan: compute delta from last recorded position
     const dx = e.touches[0].clientX - panLastX;
     const dy = e.touches[0].clientY - panLastY;
     panLastX = e.touches[0].clientX;
     panLastY = e.touches[0].clientY;
     if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
-      sendPan(dx, dy);
+      sendPointer(dx, dy);
       panThrottle = true;
       setTimeout(() => { panThrottle = false; }, PAN_THROTTLE_MS);
     }
@@ -169,7 +166,7 @@ zoomPadEl.addEventListener("touchend", (e) => {
   if (e.touches.length < 1) {
     panLastX = null;
     panLastY = null;
-    zoomPadEl.classList.remove("zoom-pad--panning");
+    zoomPadEl.classList.remove("zoom-pad--pointing");
   }
 }, { passive: true });
 

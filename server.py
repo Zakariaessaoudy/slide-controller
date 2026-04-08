@@ -12,7 +12,7 @@ from flask import Flask, jsonify, render_template, request
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 PORT = 8080
-PAN_SPEED = 2.0  # amplify phone touch pixels → scroll pixels
+POINTER_SPEED = 5.0  # amplify phone touch pixels → screen cursor pixels
 
 # macOS virtual key codes
 _kVK_LeftArrow  = 0x7B
@@ -50,29 +50,26 @@ def _press_key(key_code: int) -> None:
         Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
 
 
-def _pan(dx: float, dy: float) -> None:
-    """Simulate a two-finger trackpad scroll to pan within the zoomed slide.
+def _move_cursor(dx: float, dy: float) -> None:
+    """Move the macOS cursor by a relative (dx, dy) offset.
 
-    Using scroll events (kCGScrollEventUnitPixel, no modifier flags) means
-    the OS and presentation apps treat this exactly like a two-finger swipe
-    on a physical trackpad — panning the content rather than triggering any
-    UI element (cursor movement would hit navigation buttons in Canva etc.).
-
-    Direction convention (natural scrolling):
-      drag finger UP   → dy < 0 → wheel1 > 0 → content scrolls up
-      drag finger DOWN → dy > 0 → wheel1 < 0 → content scrolls down
-      drag finger LEFT → dx < 0 → wheel2 > 0 → content scrolls left
-      drag finger RIGHT→ dx > 0 → wheel2 < 0 → content scrolls right
+    Uses CGWarpMouseCursorPosition to reposition the cursor, then posts a
+    kCGEventMouseMoved so applications (Keynote, Canva, etc.) receive the
+    standard cursor-moved notification and update hover state / laser pointer.
     """
-    ev = Quartz.CGEventCreateScrollWheelEvent2(
-        None, Quartz.kCGScrollEventUnitPixel, 2,
-        int(-dy * PAN_SPEED),   # wheel1: vertical
-        int(-dx * PAN_SPEED),   # wheel2: horizontal
-        0
-    )
-    # No flags — plain scroll, must not carry kCGEventFlagMaskControl
-    # (that would re-trigger the macOS zoom instead of panning)
-    Quartz.CGEventSetFlags(ev, 0)
+    current = Quartz.CGEventGetLocation(Quartz.CGEventCreate(None))
+    new_x = current.x + dx * POINTER_SPEED
+    new_y = current.y + dy * POINTER_SPEED
+
+    # Clamp to main display bounds
+    bounds = Quartz.CGDisplayBounds(Quartz.CGMainDisplayID())
+    new_x = max(bounds.origin.x, min(new_x, bounds.origin.x + bounds.size.width  - 1))
+    new_y = max(bounds.origin.y, min(new_y, bounds.origin.y + bounds.size.height - 1))
+
+    new_pos = Quartz.CGPoint(new_x, new_y)
+    Quartz.CGWarpMouseCursorPosition(new_pos)
+
+    ev = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventMouseMoved, new_pos, 0)
     Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
 
 
@@ -119,11 +116,11 @@ def prev_slide():
     return jsonify(action="prev")
 
 
-@app.post("/pan")
-def pan():
+@app.post("/pointer")
+def pointer():
     data = request.get_json(silent=True) or {}
-    _pan(float(data.get("dx", 0)), float(data.get("dy", 0)))
-    return jsonify(action="pan")
+    _move_cursor(float(data.get("dx", 0)), float(data.get("dy", 0)))
+    return jsonify(action="pointer")
 
 
 @app.post("/zoom-in")
